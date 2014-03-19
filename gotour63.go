@@ -1,10 +1,10 @@
 package main
 
 import (
-		"io"
-		"os"
-		"strings"
-       )
+	"io"
+	"os"
+	"strings"
+)
 
 type rot13Reader struct {
 	r io.Reader
@@ -34,7 +34,7 @@ func (rot13 rot13Reader) Read(p []byte) (int, error) {
 
 func main() {
 	s := strings.NewReader(
-		   "Lbh penpxrq gur pbqr!")
-	   r := rot13Reader{s}
-   io.Copy(os.Stdout, &r)
+		"Lbh penpxrq gur pbqr!")
+	r := rot13Reader{s}
+	io.Copy(os.Stdout, &r)
 }

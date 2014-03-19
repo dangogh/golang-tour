@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-    "math"
+	"math"
 )
 
 type ErrNegativeSqrt float64
@@ -13,9 +13,9 @@ func (e ErrNegativeSqrt) Error() string {
 }
 
 func Sqrt(x float64) (float64, error) {
-    if x < 0 {
-    	return 0, ErrNegativeSqrt(x)
-    }
+	if x < 0 {
+		return 0, ErrNegativeSqrt(x)
+	}
 	oldz, z := x, x/2.0
 	ii := 0
 	for math.Abs(z-oldz) > 1e-15 {

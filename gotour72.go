@@ -26,7 +26,7 @@ func Walk(t *tree.Tree, ch chan<- int) {
 func Same(t1, t2 *tree.Tree) bool {
 	ch1, ch2 := make(chan int), make(chan int)
 	go Walk(t1, ch1)
-    go Walk(t2, ch2)
+	go Walk(t2, ch2)
 	for val1 := range ch1 {
 		val2, ok := <-ch2
 		if ok && val1 == val2 {
@@ -34,7 +34,7 @@ func Same(t1, t2 *tree.Tree) bool {
 		}
 		return false
 	}
-    return true
+	return true
 }
 
 func main() {
