@@ -16,19 +16,22 @@ type empty struct{}
 // pages starting with url, to a maximum of depth.
 func Crawl(url string, depth int, fetcher Fetcher, ch chan<- string, done chan<- empty) {
 	defer func() {
+		fmt.Println("Level ", depth, " done")
 		done <- empty{}
 	}()
+
 	if depth <= 0 {
 		return
 	}
 
+	fmt.Println("Starting Level ", depth)
 	body, urls, err := fetcher.Fetch(url)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	ch <- url
 	fmt.Printf("found: %s %q\n", url, body)
+	ch <- url
 
 	waitforN := make(chan empty)
 	for _, u := range urls {
@@ -38,7 +41,6 @@ func Crawl(url string, depth int, fetcher Fetcher, ch chan<- string, done chan<-
 	for _, _ = range urls {
 		<-waitforN
 	}
-	done <- empty{}
 	return
 }
 
@@ -46,7 +48,7 @@ func main() {
 	// make unique
 	ch := make(chan string)
 	done := make(chan empty)
-	Crawl("http://golang.org/", 4, fetcher, ch, done)
+	go Crawl("http://golang.org/", 4, fetcher, ch, done)
 
 	uniq := make(chan string)
 	var seen map[string]bool
