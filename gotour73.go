@@ -2,7 +2,6 @@ package main
 
 import (
     "fmt"
-    "sync"
 )
 
 type Fetcher interface {
@@ -11,59 +10,62 @@ type Fetcher interface {
     Fetch(url string) (body string, urls []string, err error)
 }
 
-type seen struct {
-	s map[string]bool
-    m sync.Mutex
-}
-
-func (s *seen) newToMe(url string) bool {
-    defer func() {
-        s.s[url] = true
-    	s.m.Unlock()
-    }()
-    s.m.Lock()
-    return s.s[url]
-}
+type empty struct {}
 
 // Crawl uses fetcher to recursively crawl
 // pages starting with url, to a maximum of depth.
-func Crawl(url string, depth int, fetcher Fetcher) {
+func Crawl(url string, depth int, fetcher Fetcher, ch chan<- string, done chan<- empty) {
+    defer func() {
+        done <- empty{}
+    }()
     if depth <= 0 {
         return
     }
 
-    // make unique
-    ch := make(chan string)
-    uniq := make(chan string)
-    go func() {    
-    	var s seen
-        for u := range ch {
-            if s.newToMe(u) {
-            	uniq <- u
-            }
-        }
-    }()
+    body, urls, err := fetcher.Fetch(url)
+    if err != nil {
+   		fmt.Println(err)
+        return
+	}
     ch <- url
-    
-    for url := range uniq {
-        go func() {
-		    body, urls, err := fetcher.Fetch(url)
-		    if err != nil {
-        		fmt.Println(err)
-		        return
-    		}
-		    fmt.Printf("found: %s %q\n", url, body)
-            for _, u := range urls {
-            	ch <- u
-            }
-        }()
-    }
+    fmt.Printf("found: %s %q\n", url, body)
 
+    waitforN := make(chan empty)
+    for _, u := range urls {
+      go Crawl(u, depth-1, fetcher, ch, waitforN)
+    }
+    // wait for all to finish before declaring done
+    for _, _ = range urls {
+    	<- waitforN
+    }
+    done <- empty{}
     return
 }
 
 func main() {
-    Crawl("http://golang.org/", 4, fetcher)
+    // make unique
+    ch := make(chan string)
+    done := make(chan empty)
+    Crawl("http://golang.org/", 4, fetcher, ch, done)
+    
+    uniq := make(chan string)
+    var seen map[string]bool
+    go func() {
+        for url := range ch {
+            if _, ok := seen[url]; !ok {
+                continue
+            }
+            seen[url] = true
+            uniq <- url
+        }
+	    // wait for top one to finish
+      	<-done
+        close(uniq)
+    }()
+    
+    for url := range uniq {
+    	fmt.Println("Got ", url)
+    }
 }
 
 // fakeFetcher is Fetcher that returns canned results.
