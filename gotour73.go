@@ -12,14 +12,14 @@ type Fetcher interface {
 
 type empty struct{}
 
+type urlfetched struct {
+	d int
+	url string
+}
+
 // Crawl uses fetcher to recursively crawl
 // pages starting with url, to a maximum of depth.
-func Crawl(url string, depth int, fetcher Fetcher, ch chan<- string, uniq <-chan string, done chan<- empty) {
-	defer func() {
-		fmt.Println("Level ", depth, " done")
-		done <- empty{}
-	}()
-
+func Crawl(url string, depth int, fetcher Fetcher) {
 	if depth <= 0 {
 		return
 	}
@@ -31,18 +31,10 @@ func Crawl(url string, depth int, fetcher Fetcher, ch chan<- string, uniq <-chan
 		return
 	}
 	fmt.Printf("found: %s %q\n", url, body)
-	ch <- url
 
-	waitforN := make(chan empty)
 	for _, u := range urls {
-		go Crawl(u, depth-1, fetcher, ch, waitforN)
+		ch <- u
 	}
-	// wait for all to finish before declaring done
-	fmt.Println("waiting for ", len(urls), " to finish at level ", depth)
-	for _, _ = range urls {
-		<-waitforN
-	}
-	fmt.Println("done waiting for ", len(urls), " to finish at level ", depth)
 	return
 }
 
