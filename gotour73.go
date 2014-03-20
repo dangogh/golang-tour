@@ -14,7 +14,7 @@ type empty struct{}
 
 // Crawl uses fetcher to recursively crawl
 // pages starting with url, to a maximum of depth.
-func Crawl(url string, depth int, fetcher Fetcher, ch chan<- string, done chan<- empty) {
+func Crawl(url string, depth int, fetcher Fetcher, ch chan<- string, uniq <-chan string, done chan<- empty) {
 	defer func() {
 		fmt.Println("Level ", depth, " done")
 		done <- empty{}
@@ -38,22 +38,26 @@ func Crawl(url string, depth int, fetcher Fetcher, ch chan<- string, done chan<-
 		go Crawl(u, depth-1, fetcher, ch, waitforN)
 	}
 	// wait for all to finish before declaring done
+	fmt.Println("waiting for ", len(urls), " to finish at level ", depth)
 	for _, _ = range urls {
 		<-waitforN
 	}
+	fmt.Println("done waiting for ", len(urls), " to finish at level ", depth)
 	return
 }
 
 func main() {
 	// make unique
 	ch := make(chan string)
-	done := make(chan empty)
-	go Crawl("http://golang.org/", 4, fetcher, ch, done)
-
 	uniq := make(chan string)
+	done := make(chan empty)
+	go Crawl("http://golang.org/", 4, fetcher, ch, uniq, done)
+
 	var seen map[string]bool
 	go func() {
-		for url := range ch {
+		for {
+			select {
+			case 
 			if _, ok := seen[url]; !ok {
 				continue
 			}
@@ -61,9 +65,10 @@ func main() {
 			uniq <- url
 		}
 		// wait for top one to finish
-		<-done
-		close(uniq)
 	}()
+
+	fmt.Println("waiting for done")
+	<-done
 
 	for url := range uniq {
 		fmt.Println("Got ", url)
