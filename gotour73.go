@@ -4,7 +4,18 @@ import (
 	"fmt"
 )
 
+type Uniquer interface {
+	IsUniq(s string) bool
+}
+
+type uniquer struct {
+	in chan string
+	out chan empty
+	m map[string]empty
+}
+
 type Fetcher interface {
+	Uniquer
 	// Fetch returns the body of URL and
 	// a slice of URLs found on that page.
 	Fetch(url string) (body string, urls []string, err error)
@@ -12,9 +23,26 @@ type Fetcher interface {
 
 type empty struct{}
 
-type urlfetched struct {
-	d int
-	url string
+func (u *Uniquer) IsUniq(s string) bool {
+	u.in <- s
+	return <-u.out
+}
+
+func (u *Uniquer) makeUniquer() func(s string) {
+	in := make(chan string)
+	out := make(chan empty)
+	seen := make(map[string]empty)
+	
+	go func() {
+		for s := range ch {
+			seenit := false
+			if _, seenit = seen[s]; !seenit {
+				// not found -- add it
+				seen[s] = empty{}
+			}
+			uniq <- !seenit
+		}
+	}()
 }
 
 // Crawl uses fetcher to recursively crawl
@@ -32,18 +60,13 @@ func Crawl(url string, depth int, fetcher Fetcher) {
 	}
 	fmt.Printf("found: %s %q\n", url, body)
 
-	for _, u := range urls {
-		ch <- u
-	}
 	return
 }
 
 func main() {
-	// make unique
-	ch := make(chan string)
-	uniq := make(chan string)
-	done := make(chan empty)
-	go Crawl("http://golang.org/", 4, fetcher, ch, uniq, done)
+
+	fetcher.makeUniquer()
+	go Crawl("http://golang.org/", 4, fetcher)
 
 	var seen map[string]bool
 	go func() {
@@ -59,9 +82,6 @@ func main() {
 		// wait for top one to finish
 	}()
 
-	fmt.Println("waiting for done")
-	<-done
-
 	for url := range uniq {
 		fmt.Println("Got ", url)
 	}
@@ -73,6 +93,7 @@ type fakeFetcher map[string]*fakeResult
 type fakeResult struct {
 	body string
 	urls []string
+	u uniquer
 }
 
 func (f fakeFetcher) Fetch(url string) (string, []string, error) {
